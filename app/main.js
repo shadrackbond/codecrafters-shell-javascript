@@ -15,15 +15,14 @@ function prompt() {
       rl.close();
       process.exit(0);
     }
-    let myAnswer = `${answer}: command not found`
+    let myAnswer = `${answer}: command not found`;
+    //to run echo function
     const argument = 'echo';
-
     if(answer.includes(argument)){
-      const newAnswer = answer.replace(argument,"") + '\n';
+      const newAnswer = answer.replace(argument,"");
       myAnswer = newAnswer.trimStart();
     }
     console.log(myAnswer)
-
     prompt();
   });
 }
