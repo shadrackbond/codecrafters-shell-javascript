@@ -13,10 +13,10 @@ function prompt() {
     let myAnswer = `${answer}: command not found`
     console.log(myAnswer)
 
-    //function to decide if shell should continue
     if (answer === 'exit') {
-      rl.close;//close the interface
-      return;//stop the function here
+      console.log("$ exit 0")
+      rl.close();
+      process.exit(0);
     }
     prompt();
   });
