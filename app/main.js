@@ -6,7 +6,20 @@ const rl = readline.createInterface({
 });
 
 //Uncomment this block to pass the first stage
-rl.question("$ ", (answer) => {
-  console.log(`${answer}: command not found`)
-  rl.close();
-});
+
+function prompt() {
+
+  rl.question("$ ", (answer) => {
+    let myAnswer = `${answer}: command not found`
+    console.log(myAnswer)
+
+    //function to decide if shell should continue
+    if (answer === 'exit') {
+      rl.close;//close the interface
+      return;//stop the function here
+    }
+    prompt();
+  });
+}
+
+prompt();
