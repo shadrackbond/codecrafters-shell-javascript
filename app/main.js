@@ -13,8 +13,8 @@ function prompt() {
     let myAnswer = `${answer}: command not found`
     console.log(myAnswer)
 
-    if (answer === 'exit') {
-      console.log("$ exit 0")
+    if (answer === 'exit' || answer === '0') {
+      console.log("exit 0")
       rl.close();
       process.exit(0);
     }
