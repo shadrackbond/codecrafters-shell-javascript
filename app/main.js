@@ -25,7 +25,6 @@ function findCommandInPath(command) {
       fs.readdir(dir, (err, files) => {
         if (err) {
           fs.writeFile("./test.txt", "error", () => { });
-          return;
         }
         files.forEach((file) => {
           const content = `${dir}/${file}`;
