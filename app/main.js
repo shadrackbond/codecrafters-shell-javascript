@@ -7,6 +7,18 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
+const readDir = (dir) => {
+  fs.readdirSync(dir, (err, files) => {
+    if (err) {
+      fs.writeFileSync("./test.txt", "error", () => { });
+    }
+    files.forEach((file) => {
+      const content = `${dir}/${file}`;
+      fs.writeFileSync("./test.txt", content, () => { });
+    })
+  })
+}
+
 /**
  * Checks if a command exists and is a file in the directories
  * specified in the PATH environment variable.
@@ -22,15 +34,7 @@ function findCommandInPath(command) {
 
 
     for (const dir of path_dirs) {
-      fs.readdir(dir, (err, files) => {
-        if (err) {
-          fs.writeFile("./test.txt", "error", () => { });
-        }
-        files.forEach((file) => {
-          const content = `${dir}/${file}`;
-          fs.writeFile("./test.txt", content, () => { });
-        })
-      })
+      //readDir(dir);
       // path.join is robust across operating systems
       const filePath = path.join(dir, command);
 
