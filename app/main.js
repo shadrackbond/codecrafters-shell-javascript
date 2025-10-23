@@ -20,7 +20,7 @@ function findCommandInPath(command) {
     // leading/trailing/double colons (e.g., ::/usr/bin)
     const path_dirs = process.env.PATH.split(":").filter(p => p.length > 0);
 
-    console.log({ path_dirs, command });
+    //console.log({ path_dirs, command });
 
     for (const dir of path_dirs) {
       // path.join is robust across operating systems
