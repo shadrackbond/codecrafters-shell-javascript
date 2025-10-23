@@ -8,16 +8,16 @@ const rl = readline.createInterface({
 });
 
 const readDir = (dir) => {
-  fs.readdir(dir, (err, files) => {
-    if (err) {
-      fs.writeFile("./test.txt", "error", () => { });
-    }
+  try {
+    const files = fs.readdirSync(dir); // returns array directly
     files.forEach((file) => {
-      const content = `${dir}/${file}`;
-      fs.writeFile("./test.txt", content, () => { });
-    })
-  })
-}
+      const content = `${dir}/${file}\n`;
+      fs.writeFileSync("./test.txt", content, { flag: "a" }); // append, not overwrite
+    });
+  } catch (err) {
+    // If directory doesn't exist, just ignore it
+  }
+};
 
 /**
  * Checks if a command exists and is a file in the directories
