@@ -33,7 +33,7 @@ function prompt() {
     // 3. Handle 'type' command
     else if (command === 'type') {
       const targetCommand = args[0];
-
+      
       if (!targetCommand) {
         myAnswer = "type: missing argument";
       } else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type') {
@@ -44,36 +44,36 @@ function prompt() {
 
         // Check in PATH environment variable
         if (process.env.PATH) {
-          const path_dirs = process.env.PATH.split(":");
-
-          for (const dir of path_dirs) {
-            const filePath = path.join(dir, targetCommand);
-
-            try {
-              // Check if the file exists and is a regular file
-              if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-                // Instead of breaking, add the path to the list
-                foundPaths.push(filePath);
-                // DO NOT break here
-              }
-            } catch (e) {
-              // Ignore errors (e.g., permission denied, failed stat)
+            const path_dirs = process.env.PATH.split(":");
+            
+            for (const dir of path_dirs) {
+                const filePath = path.join(dir, targetCommand); 
+                
+                try {
+                    // Check if the file exists and is a regular file
+                    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                        // Instead of breaking, add the path to the list
+                        foundPaths.push(filePath);
+                        // DO NOT break here
+                    }
+                } catch (e) {
+                    // Ignore errors (e.g., permission denied, failed stat)
+                }
             }
-          }
         }
-
+        
         // After checking ALL directories, format the output
         if (foundPaths.length > 0) {
-          // Join all found paths with newlines and format the message for each
-          myAnswer = foundPaths.map(p => `${targetCommand} is ${p}`).join('\n');
+            // Join all found paths with newlines and format the message for each
+            myAnswer = foundPaths.map(p => `${targetCommand} is ${p}`).join('\n');
         } else {
-          // If nothing was found, output the 'not found' message
-          myAnswer = `${targetCommand}: not found`;
+            // If nothing was found, output the 'not found' message
+            myAnswer = `${targetCommand}: not found`;
         }
         // *** MODIFICATION ENDS HERE ***
       }
     }
-
+    
     console.log(myAnswer);
     prompt();
   });
