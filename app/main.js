@@ -21,19 +21,27 @@ const checkIfExecutable = (path) => {
  * @returns {string | null} The full path to the executable if found, otherwise null.
  */
 function findCommandInPath(command) {
-  if (!process.env.PATH) return null;
+  const pathEnv = process.env.PATH;
+  if (!pathEnv) return null;
 
-  const pathDirs = process.env.PATH.split(":").filter(p => p.length > 0);
+  const pathDirs = pathEnv.split(":").filter(Boolean);
 
   for (const dir of pathDirs) {
     const filePath = path.join(dir, command);
 
     try {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile() && fs.accessSync(filePath, fs.constants.X_OK)) {
-        return filePath;
+      // Check existence
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+
+        // Must be a regular file and executable
+        if (stats.isFile()) {
+          fs.accessSync(filePath, fs.constants.X_OK);
+          return filePath;
+        }
       }
-    } catch (e) {
-      // Ignore permission errors or missing dirs
+    } catch {
+      // Ignore missing dirs, permission errors, etc.
     }
   }
 
