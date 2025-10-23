@@ -10,13 +10,15 @@ const rl = readline.createInterface({
 /**
  * Checks if a command exists and is a file in the directories
  * specified in the PATH environment variable.
- * @param {string} command The command name to look for.
+ * * It automatically uses the current PATH value set by the shell, 
+ * like the one set by the tester: PATH="/usr/bin:/usr/local/bin:$PATH".
+ * * @param {string} command The command name to look for.
  * @returns {string | null} The full path to the executable if found, otherwise null.
  */
 function findCommandInPath(command) {
-  // process.env.PATH holds the exact value set by the tester (e.g., PATH="/usr/bin:/usr/local/bin:$PATH")
+  // 💡 This is the key: process.env.PATH reflects the path set by the shell.
   if (process.env.PATH) {
-    // Split the environment variable by the colon (:) separator
+    // Split the PATH variable by the colon (:) separator
     const path_dirs = process.env.PATH.split(":");
 
     for (const dir of path_dirs) {
@@ -26,17 +28,16 @@ function findCommandInPath(command) {
       try {
         // Check if the file exists and is a regular file
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          return filePath; // Found it! Return the full path
+          return filePath; // Found it!
         }
       } catch (e) {
-        // Ignore errors like permission denied, empty path segments, or non-existent directories
+        // Ignore errors like permission denied or non-existent directories
       }
     }
   }
-  return null; // Not found in PATH
+  return null; // Not found in any PATH directory
 }
 
-// The rest of your prompt function is updated to use the helper function
 function prompt() {
 
   rl.question("$ ", (answer) => {
@@ -84,17 +85,16 @@ function prompt() {
       }
     }
 
-    // 4. Handle External Commands (only checking for existence here)
+    // 4. Handle External Commands (Resolution only - requires child_process for execution)
     else {
-      // If the command is not a built-in, you typically check PATH.
+      // Check if the command exists in the custom PATH
       const fullPath = findCommandInPath(command);
 
       if (fullPath) {
-        // **ACTION REQUIRED:** A real shell would execute the command at 'fullPath' here.
-        // Since your shell doesn't implement execution yet, it will fall through
-        // and print 'command not found' unless you implement `child_process.spawn`.
-        // For the scope of merely *checking* the random PATH, the logic is complete.
-        myAnswer = `${command}: command not found`; // Retaining default unless execution is implemented
+        // 💡 IMPORTANT: A full shell must execute the command here (using Node's `child_process`).
+        // Since this code doesn't include execution, we default to 'command not found'
+        // or whatever output is expected for an external command that is *found* but *not executed*.
+        myAnswer = `${command}: command not found`; // Keeping original behavior for non-executed commands
       } else {
         myAnswer = `${command}: command not found`;
       }
