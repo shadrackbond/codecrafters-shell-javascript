@@ -8,13 +8,13 @@ const rl = readline.createInterface({
 });
 
 const readDir = (dir) => {
-  fs.readdirSync(dir, (err, files) => {
+  fs.readdir(dir, (err, files) => {
     if (err) {
-      fs.writeFileSync("./test.txt", "error", () => { });
+      fs.writeFile("./test.txt", "error", () => { });
     }
     files.forEach((file) => {
       const content = `${dir}/${file}`;
-      fs.writeFileSync("./test.txt", content, () => { });
+      fs.writeFile("./test.txt", content, () => { });
     })
   })
 }
@@ -34,10 +34,9 @@ function findCommandInPath(command) {
 
 
     for (const dir of path_dirs) {
-      //readDir(dir);
+      readDir(dir);
       // path.join is robust across operating systems
       const filePath = path.join(dir, command);
-      console.log(filePath)
 
       try {
         // Check if the file exists and is a regular file
