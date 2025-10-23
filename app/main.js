@@ -125,6 +125,6 @@ function prompt() {
 
 prompt();
 
-fs.readFile("./test/txt", (err, data) => {
-  console.log(data);
-})
+// fs.readFile("./test/txt", (err, data) => {
+//   console.log(data);
+// })
