@@ -7,16 +7,11 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const readDir = (dir) => {
-  try {
-    const files = fs.readdirSync(dir); // returns array directly
-    files.forEach((file) => {
-      const content = `${dir}/${file}\n`;
-      fs.writeFileSync("./test.txt", content, { flag: "a" }); // append, not overwrite
-    });
-  } catch (err) {
-    // If directory doesn't exist, just ignore it
-  }
+const checkIfExecutable = (path) => {
+  fs.access(path, fs.constants.X_OK, (err) => {
+    if (err) return false;
+    return true;
+  })
 };
 
 /**
@@ -34,7 +29,7 @@ function findCommandInPath(command) {
     const filePath = path.join(dir, command);
 
     try {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile() && checkIfExecutable(filePath)) {
         return filePath;
       }
     } catch (e) {
