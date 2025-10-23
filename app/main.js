@@ -29,7 +29,7 @@ function findCommandInPath(command) {
     const filePath = path.join(dir, command);
 
     try {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile() && checkIfExecutable(filePath) == true) {
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile() && fs.accessSync(filePath, fs.constants.X_OK)) {
         return filePath;
       }
     } catch (e) {
