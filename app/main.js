@@ -40,6 +40,7 @@ function findCommandInPath(command) {
 }
 
 
+
 async function prompt() {
 
   rl.question("$ ", (answer) => {
