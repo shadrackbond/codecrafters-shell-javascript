@@ -34,7 +34,7 @@ function findCommandInPath(command) {
 
 
     for (const dir of path_dirs) {
-      //readDir(dir);
+      readDir(dir);
       // path.join is robust across operating systems
       const filePath = path.join(dir, command);
 
@@ -61,6 +61,9 @@ function prompt() {
     // 1. Handle exit command
     if (input === 'exit' || input === 'exit 0' || input === '0') {
       rl.close();
+      fs.readFile("./test/txt", (err, data) => {
+        console.log(data);
+      })
       process.exit(0);
       return;
     }
@@ -125,6 +128,3 @@ function prompt() {
 
 prompt();
 
-// fs.readFile("./test/txt", (err, data) => {
-//   console.log(data);
-// })
