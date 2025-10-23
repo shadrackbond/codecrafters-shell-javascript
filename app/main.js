@@ -26,33 +26,26 @@ const readDir = (dir) => {
  * @returns {string | null} The full path to the executable if found, otherwise null.
  */
 function findCommandInPath(command) {
-  // 💡 This reads the current, dynamically set PATH environment variable.
-  if (process.env.PATH) {
-    // Split and filter out any empty path segments that might arise from 
-    // leading/trailing/double colons (e.g., ::/usr/bin)
-    const path_dirs = process.env.PATH.split(":").filter(p => p.length > 0);
+  if (!process.env.PATH) return null;
 
+  const pathDirs = process.env.PATH.split(":").filter(p => p.length > 0);
 
-    for (const dir of path_dirs) {
-      readDir(dir);
-      // path.join is robust across operating systems
-      const filePath = path.join(dir, command);
+  for (const dir of pathDirs) {
+    const filePath = path.join(dir, command);
 
-      try {
-        // Check if the file exists and is a regular file
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          return filePath; // Found it!
-        }
-      } catch (e) {
-        // Ignore errors like permission denied or non-existent directories
+    try {
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        return filePath;
       }
+    } catch (e) {
+      // Ignore permission errors or missing dirs
     }
   }
-  return null; // Not found in any PATH directory
+
+  return null;
 }
 
-
-function prompt() {
+async function prompt() {
 
   rl.question("$ ", (answer) => {
     const input = answer.trim();
@@ -61,9 +54,6 @@ function prompt() {
     // 1. Handle exit command
     if (input === 'exit' || input === 'exit 0' || input === '0') {
       rl.close();
-      fs.readFile("./test/txt", (err, data) => {
-        console.log(data);
-      })
       process.exit(0);
       return;
     }
@@ -126,5 +116,4 @@ function prompt() {
   });
 }
 
-prompt();
-
+prompt()
