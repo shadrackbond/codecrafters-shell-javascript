@@ -34,9 +34,10 @@ function findCommandInPath(command) {
 
 
     for (const dir of path_dirs) {
-      readDir(dir);
+      //readDir(dir);
       // path.join is robust across operating systems
       const filePath = path.join(dir, command);
+      console.log(filePath)
 
       try {
         // Check if the file exists and is a regular file
