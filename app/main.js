@@ -7,11 +7,8 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const checkIfExecutable = (path) => {
-  fs.access(path, fs.constants.X_OK, (err) => {
-    if (err) return false;
-    return true;
-  })
+const readDir = (path) => {
+
 };
 
 /**
@@ -28,13 +25,17 @@ function findCommandInPath(command) {
   for (const dir of pathDirs) {
     const filePath = path.join(dir, command);
 
-    const isExecutable = checkIfExecutable(filePath);
     try {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile() && isExecutable) {
-        return filePath;
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+
+        if (stats.isFile()) {
+          fs.accessSync(filePath, fs.constants.X_OK); // throws if not executable
+          return filePath;
+        }
       }
-    } catch (e) {
-      // Ignore permission errors or missing dirs
+    } catch {
+      // Ignore errors (non-executable, not found, permission denied, etc.)
     }
   }
 
