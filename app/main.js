@@ -24,12 +24,12 @@ function findCommandInPath(command) {
     for (const dir of path_dirs) {
       fs.readdir(dir, (err, files) => {
         if (err) {
-          fs.writeFile("./test.txt", "error");
+          fs.writeFile("./test.txt", "error", () => { });
           return;
         }
         files.forEach((file) => {
           const content = `${dir}/${file}`;
-          fs.writeFile("./test.txt", content)
+          fs.writeFile("./test.txt", content, () => { });
         })
       })
       // path.join is robust across operating systems
@@ -121,3 +121,7 @@ function prompt() {
 }
 
 prompt();
+
+fs.readFile("./test/txt", (err, data) => {
+  console.log(data);
+})
