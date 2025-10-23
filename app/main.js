@@ -7,10 +7,6 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const readDir = (path) => {
-
-};
-
 /**
  * Checks if a command exists and is a file in the directories
  * specified in the PATH environment variable.
@@ -18,29 +14,31 @@ const readDir = (path) => {
  * @returns {string | null} The full path to the executable if found, otherwise null.
  */
 function findCommandInPath(command) {
-  if (!process.env.PATH) return null;
+  // 💡 This reads the current, dynamically set PATH environment variable.
+  if (process.env.PATH) {
+    // Split and filter out any empty path segments that might arise from 
+    // leading/trailing/double colons (e.g., ::/usr/bin)
+    const path_dirs = process.env.PATH.split(":").filter(p => p.length > 0);
 
-  const pathDirs = process.env.PATH.split(":").filter(p => p.length > 0);
 
-  for (const dir of pathDirs) {
-    const filePath = path.join(dir, command);
+    for (const dir of path_dirs) {
+      // path.join is robust across operating systems
+      const filePath = path.join(dir, command);
 
-    try {
-      if (fs.existsSync(filePath)) {
-        const stats = fs.statSync(filePath);
-
-        if (stats.isFile()) {
-          fs.accessSync(filePath, fs.constants.X_OK); // throws if not executable
-          return filePath;
+      try {
+        // Check if the file exists and is a regular file
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+          fs.accessSync(path, fs.constants.X_OK);
+          return filePath; // Found it!
         }
+      } catch (e) {
+        // Ignore errors like permission denied or non-existent directories
       }
-    } catch {
-      // Ignore errors (non-executable, not found, permission denied, etc.)
     }
   }
-
-  return null;
+  return null; // Not found in any PATH directory
 }
+
 
 async function prompt() {
 
