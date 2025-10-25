@@ -1,7 +1,7 @@
 const readline = require("readline");
 const fs = require("fs")
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn } = require("child_process"); // Ensure 'spawn' is imported
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -15,6 +15,7 @@ const rl = readline.createInterface({
  * @returns {string | null} The full path to the executable if found, otherwise null.
  */
 function findCommandInPath(command) {
+  // Use ':' as the separator for POSIX systems (Linux, macOS, etc.)
   if (!process.env.PATH) return null;
 
   const pathDirs = process.env.PATH.split(":").filter(p => p.length > 0);
@@ -27,7 +28,8 @@ function findCommandInPath(command) {
         const stats = fs.statSync(filePath);
 
         if (stats.isFile()) {
-          fs.accessSync(filePath, fs.constants.X_OK); // throws if not executable
+          // Check for execution permission (X_OK)
+          fs.accessSync(filePath, fs.constants.X_OK);
           return filePath;
         }
       }
@@ -39,29 +41,11 @@ function findCommandInPath(command) {
   return null;
 }
 
-  //searching for the executable with the given name in the directories in Path
-  //if found execute program
-  //the program should pass any argument to the program
-
-spawn(extrernalCommands = () =>{
-  try{
-    if(fs.existsSync(command)){
-      const commandStat = fs.statSync(command);
-      if (commandStat.isFile()){
-        fs.accessSync(command, fs.constants.X_OK);
-        return command;
-      }
-    }
-  }catch{
-    
-  }
-})
+// **NOTE: The incorrect spawn block has been removed.**
 
 async function prompt() {
-
   rl.question("$ ", (answer) => {
     const input = answer.trim();
-    let myAnswer = `${input}: command not found`;
 
     // 1. Handle exit command
     if (input === 'exit' || input === 'exit 0' || input === '0') {
@@ -70,7 +54,7 @@ async function prompt() {
       return;
     }
 
-    // Split the input into command and arguments using regex for robustness
+    // Split the input into command and arguments
     const parts = input.split(/\s+/).filter(p => p.length > 0);
     const command = parts[0];
     const args = parts.slice(1);
@@ -80,30 +64,32 @@ async function prompt() {
       return;
     }
 
-    // 2. Handle 'echo' command
+    // 2. Handle 'echo' command (Built-in)
     if (command === 'echo') {
-      myAnswer = parts.slice(1).join(' ');
+      console.log(parts.slice(1).join(' '));
+      prompt();
     }
 
-    // 3. Handle 'type' command
+    // 3. Handle 'type' command (Built-in)
     else if (command === 'type') {
       const targetCommand = args[0];
+      let output;
 
       if (!targetCommand) {
-        myAnswer = "type: missing argument";
+        output = "type: missing argument";
       } else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type') {
-        myAnswer = `${targetCommand} is a shell builtin`;
+        output = `${targetCommand} is a shell builtin`;
       } else {
-        // Use the reusable function to check the dynamic PATH
         const fullPath = findCommandInPath(targetCommand);
 
         if (fullPath) {
-          // Correct output format for 'type' when command is found in PATH
-          myAnswer = `${targetCommand} is ${fullPath}`;
+          output = `${targetCommand} is ${fullPath}`;
         } else {
-          myAnswer = `${targetCommand}: not found`;
+          output = `${targetCommand}: not found`;
         }
       }
+      console.log(output);
+      prompt();
     }
 
     // 4. Handle External Commands (Non-built-ins)
@@ -111,15 +97,39 @@ async function prompt() {
       const fullPath = findCommandInPath(command);
 
       if (fullPath) {
-        myAnswer = `${command}: command not found`;
+        // --- EXECUTE EXTERNAL COMMAND ASYNCHRONOUSLY ---
+        try {
+          // Use 'spawn' with the full executable path and arguments
+          const child = spawn(fullPath, args, {
+            // Connect the child's streams directly to the parent's terminal streams
+            stdio: 'inherit'
+          });
+
+          // Wait for the child process to finish before prompting again
+          child.on('close', (code) => {
+            // If you want to show exit code: console.log(`[Process exited with code ${code}]`);
+            prompt();
+          });
+
+          // Handle errors like spawning failure (e.g., permissions issue)
+          child.on('error', (err) => {
+            // E.g., spawn('a/path', ...) might fail if the file isn't executable despite checks
+            console.error(`Error executing ${command}: ${err.message}`);
+            prompt();
+          });
+
+        } catch (e) {
+          // Catch synchronous errors during the spawn call itself
+          console.error(`Failed to execute ${command}: ${e.message}`);
+          prompt();
+        }
+
       } else {
-        myAnswer = `${command}: command not found`;
+        // Command not found in built-ins or PATH
+        console.log(`${command}: command not found`);
+        prompt();
       }
     }
-
-
-    console.log(myAnswer);
-    prompt();
   });
 }
 
