@@ -1,6 +1,7 @@
 const readline = require("readline");
 const fs = require("fs")
-const path = require("path")
+const path = require("path");
+const { spawn } = require("child_process");
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -37,6 +38,24 @@ function findCommandInPath(command) {
 
   return null;
 }
+
+  //searching for the executable with the given name in the directories in Path
+  //if found execute program
+  //the program should pass any argument to the program
+
+spawn(extrernalCommands = () =>{
+  try{
+    if(fs.existsSync(command)){
+      const commandStat = fs.statSync(command);
+      if (commandStat.isFile()){
+        fs.accessSync(command, fs.constants.X_OK);
+        return command;
+      }
+    }
+  }catch{
+    
+  }
+})
 
 async function prompt() {
 
@@ -89,14 +108,9 @@ async function prompt() {
 
     // 4. Handle External Commands (Non-built-ins)
     else {
-      // Check if the command exists in the custom PATH
       const fullPath = findCommandInPath(command);
 
       if (fullPath) {
-        // 💡 A real shell would execute the command here. 
-        // Since this is likely not implemented yet, we output 'command not found'.
-        // If the tester requires a successful (silent) exit here, you'd change this line.
-        // For now, we assume failure as execution is missing.
         myAnswer = `${command}: command not found`;
       } else {
         myAnswer = `${command}: command not found`;
