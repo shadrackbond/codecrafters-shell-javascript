@@ -1,7 +1,7 @@
 const readline = require("readline");
 const fs = require("fs")
 const path = require("path");
-const { spawn } = require("child_process"); // Ensure 'spawn' is imported
+const { spawn } = require("child_process");
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -40,8 +40,6 @@ function findCommandInPath(command) {
 
   return null;
 }
-
-// **NOTE: The incorrect spawn block has been removed.**
 
 async function prompt() {
   rl.question("$ ", (answer) => {
@@ -98,22 +96,25 @@ async function prompt() {
 
       if (fullPath) {
         // --- EXECUTE EXTERNAL COMMAND ASYNCHRONOUSLY ---
+
         try {
-          // Use 'spawn' with the full executable path and arguments
+          // Spawn the process using the full path.
+          // Pass args (argv[1] onwards) directly.
           const child = spawn(fullPath, args, {
-            // Connect the child's streams directly to the parent's terminal streams
-            stdio: 'inherit'
+            stdio: 'inherit',
+            // CRUCIAL: Set argv0 to the user-typed command name 
+            // to control the program name inside the child process.
+            argv0: command
           });
 
           // Wait for the child process to finish before prompting again
           child.on('close', (code) => {
-            // If you want to show exit code: console.log(`[Process exited with code ${code}]`);
+            // The prompt returns only after the external command exits.
             prompt();
           });
 
           // Handle errors like spawning failure (e.g., permissions issue)
           child.on('error', (err) => {
-            // E.g., spawn('a/path', ...) might fail if the file isn't executable despite checks
             console.error(`Error executing ${command}: ${err.message}`);
             prompt();
           });
