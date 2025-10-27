@@ -75,7 +75,9 @@ async function prompt() {
       prompt();// calls the prompt() again to show a new $prompt
       return;
     }
-
+    if (targetCommand === 'pwd') {
+      console.log(__dirname);
+    }
     // 2. Handle 'echo' command (Built-in)
     if (command === 'echo') {
       console.log(args.join(' '));
