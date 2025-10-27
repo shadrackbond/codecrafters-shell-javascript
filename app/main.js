@@ -112,23 +112,54 @@ async function prompt() {
       prompt();
     }
 
-    else if(command === "cd"){
-      const targetDir = args[0] ? args[0] : require('os').homedir();
-     try{
-       process.chdir(targetDir);
-     } 
-     catch (err) {
-       if (err.code === 'ENOENT') {
-         console.log(`cd: ${args[0]}: No such file or directory`);
-       } else if (err.code === 'ENOTDIR') {
-         console.log(`cd: ${args[0]}: Not a directory`);
-       } else {
-         // For other errors like permissions
-         console.log(`cd: ${err.message}`);
-       }
-     }
-     prompt();
+    // 4. Handle 'cd' command (Built-in)
+    else if (command === "cd") {
 
+      let targetDir;
+
+      // We store the original argument for error messages
+      // If no arg is given (just 'cd'), we treat it as '~'
+      const originalArg = args[0] || '~';
+
+      // 1. Decide on the target directory
+      if (!args[0] || args[0] === '~') {
+        // User typed 'cd' or 'cd ~'
+        targetDir = process.env.HOME;
+        // A safe fallback if HOME isn't set
+        if (!targetDir) {
+          targetDir = require('os').homedir();
+        }
+      } else {
+        // User typed 'cd /some/other/path'
+        targetDir = args[0];
+      }
+
+      // 2. Try to change directory
+      try {
+        if (!targetDir) {
+          // This can happen if HOME isn't set and os.homedir() fails
+          throw new Error('Home directory not found');
+        }
+        process.chdir(targetDir);
+      }
+      // 3. Handle errors
+      catch (err) {
+        // Use the 'originalArg' to show the user what failed
+        switch (err.code) {
+          case 'ENOENT':
+            console.log(`cd: ${originalArg}: No such file or directory`);
+            break;
+          case 'ENOTDIR':
+            console.log(`cd: ${originalArg}: Not a directory`);
+            break;
+          default:
+            // For permission errors or 'Home directory not found'
+            console.log(`cd: ${err.message}`);
+        }
+      }
+
+      // 4. Call prompt() ONCE at the end
+      prompt();
     }
 
     // 5. Handle External Commands (Non-built-ins)
