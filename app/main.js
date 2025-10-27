@@ -120,12 +120,11 @@ async function prompt() {
        }
        else {
          console.log(`cd: ${args[0]}: No such file or directory`)
-         prompt();
        }
      } catch{
      }
       
-      
+     prompt()
     }
 
     // 5. Handle External Commands (Non-built-ins)
