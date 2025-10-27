@@ -119,11 +119,12 @@ async function prompt() {
          prompt();
        }
        else {
-         console.log(`cd: /${args[0]}: No such file or directory`)
+         console.log(`cd: ${args[0]}: No such file or directory`)
          prompt();
        }
      } catch(error){
           console.log(error);
+          prompt()
      }
       
       
