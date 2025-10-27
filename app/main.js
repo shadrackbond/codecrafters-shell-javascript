@@ -112,8 +112,9 @@ async function prompt() {
       prompt();
     }
     else if(command === "cd"){
-      const changeDirectory = process.chdir(args[0])
+      
      try{
+       const changeDirectory = process.chdir(args[0])
        if (changeDirectory) {
          console.log(changeDirectory)
          prompt();
