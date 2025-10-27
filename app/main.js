@@ -105,8 +105,12 @@ async function prompt() {
       console.log(output);
       prompt();
     }
+    else if (command === "pwd"){
+      console.log(__dirname);
+      prompt();
+    }
 
-    // 4. Handle External Commands (Non-built-ins)
+    // 5. Handle External Commands (Non-built-ins)
     else {
 
       const fullPath = findCommandInPath(command);
@@ -148,9 +152,7 @@ async function prompt() {
         }
 
       } 
-      else if (targetCommand === 'pwd') {
-        console.log(__dirname);
-      }
+      
       
       else {
         // Command not found in built-ins or PATH
