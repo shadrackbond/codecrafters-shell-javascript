@@ -106,7 +106,7 @@ async function prompt() {
       prompt();
     }
     else if (command === "pwd"){
-      console.log(__dirname);
+      console.log(process.cwd());
       prompt();
     }
 
