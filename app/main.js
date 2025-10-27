@@ -2,6 +2,7 @@ const readline = require("readline");
 const fs = require("fs")
 const path = require("path");
 const { spawn } = require("child_process");
+const { Console } = require("console");
 
 const rl = readline.createInterface({//builds the interface
   input: process.stdin,
@@ -105,9 +106,27 @@ async function prompt() {
       console.log(output);
       prompt();
     }
+
     else if (command === "pwd"){
       console.log(process.cwd());
       prompt();
+    }
+    else if(command === "cd"){
+      const changeDirectory = process.chdir(args[0])
+     try{
+       if (changeDirectory) {
+         console.log(changeDirectory)
+         prompt();
+       }
+       else {
+         console.log(`cd: /${args[0]}: No such file or directory`)
+         prompt();
+       }
+     } catch(error){
+          console.log(error);
+     }
+      
+      
     }
 
     // 5. Handle External Commands (Non-built-ins)
