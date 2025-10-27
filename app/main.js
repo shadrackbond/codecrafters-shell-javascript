@@ -117,7 +117,6 @@ async function prompt() {
        const changeDirectory = process.chdir(args[0])
        if (changeDirectory) {
          console.log(changeDirectory)
-         prompt();
        }
        else {
          console.log(`cd: ${args[0]}: No such file or directory`)
