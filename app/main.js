@@ -89,7 +89,11 @@ async function prompt() {
 
       if (!targetCommand) {
         output = "type: missing argument";
-      } else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type') {
+      } 
+      else if(targetCommand === 'pwd'){
+        console.log(__dirname);
+      }
+      else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type') {
         output = `${targetCommand} is a shell builtin`;
       } else {
         //if the target command is not an inbuilt it uses the findCommandInPath function earlier made to search for its path
