@@ -75,9 +75,6 @@ async function prompt() {
       prompt();// calls the prompt() again to show a new $prompt
       return;
     }
-    if (targetCommand === 'pwd') {
-      console.log(__dirname);
-    }
     // 2. Handle 'echo' command (Built-in)
     if (command === 'echo') {
       console.log(args.join(' '));
@@ -150,7 +147,12 @@ async function prompt() {
           prompt();
         }
 
-      } else {
+      } 
+      else if (targetCommand === 'pwd') {
+        console.log(__dirname);
+      }
+      
+      else {
         // Command not found in built-ins or PATH
         console.log(`${command}: command not found`);
         prompt();
