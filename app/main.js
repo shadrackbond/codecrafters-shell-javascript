@@ -179,25 +179,24 @@ async function prompt() {
         return prompt();
       }
 
-      // --- REVERSED LOGIC TO PASS THE TEST ---
+      // --- LOGIC SWAPPED BACK ---
 
-      // 1. Search the PATH first (as required by the test)
-      const fullPath = findCommandInPath(target);
-
-      if (fullPath) {
-        output = `${target} is ${fullPath}\n`;
-      }
-      // 2. If not in PATH, check if it's a builtin
-      else if (builtins.includes(target)) { // Use the global 'builtins' array
+      // ✅ 1. Check if it's a builtin first (to pass test #EI0)
+      if (builtins.includes(target)) {
         output = `${target} is a shell builtin\n`;
       }
-      // 3. If not in either, it's not found
+      // ✅ 2. Otherwise, look through PATH
       else {
-        output = `type: ${target}: not found\n`;
-        isError = true;
+        const fullPath = findCommandInPath(target);
+        if (fullPath) {
+          output = `${target} is ${fullPath}\n`;
+        } else {
+          output = `type: ${target}: not found\n`;
+          isError = true;
+        }
       }
 
-      // 4. Use writeOutput to respect redirection
+      // ✅ 3. Use writeOutput to respect redirection
       if (isError) {
         writeOutput(output, stderrFile, stderrAppend, true);
       } else {
@@ -206,9 +205,6 @@ async function prompt() {
 
       return prompt();
     }
-
-
-
     // ------------------ BUILT-IN: pwd ------------------
     if (command === "pwd") {
       const output = process.cwd() + "\n";
