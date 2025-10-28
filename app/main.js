@@ -157,8 +157,20 @@ async function prompt() {
     // 2. Handle 'echo' command
     if (command === 'echo') {
       const output = args.join(' ') + '\n';
-      // Echo output always goes to stdout
-      writeOutput(output, stdoutFile, stdoutAppend, false);
+
+      if (stdoutFile) {
+        const flags = stdoutAppend ? 'a' : 'w';
+        try {
+          fs.writeFileSync(stdoutFile, output, { flag: flags });
+        } catch (e) {
+          console.error(`Shell error: ${e.message}`);
+        }
+      } else {
+        // Write to standard output (the screen)
+        process.stdout.write(output);
+      }
+
+      // (You'd also add a check for stderrFile if echo could produce errors)
       prompt();
     }
 
