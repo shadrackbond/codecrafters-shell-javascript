@@ -5,7 +5,7 @@ const { spawn } = require("child_process");
 const os = require("os"); // For cd ~ expansion
 
 // ------------------ BUILT-INS ------------------
-const builtins = ["echo", "exit", "type", "pwd", "cd", "cat"];
+const builtins = ["echo", "exit", "type", "pwd", "cd"];
 
 // ------------------ SIMPLE COMPLETER ------------------
 function completer(line) {
