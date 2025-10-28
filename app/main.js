@@ -8,6 +8,76 @@ const rl = readline.createInterface({//builds the interface
   input: process.stdin,
   output: process.stdout,
 });
+/**
+ * Parses a list of command parts for redirection tokens.
+ * @param {string[]} parts - The raw parts from the user's input.
+ * @returns {object} An object containing:
+ * - command: The command (first part)
+ * - args: An array of "cleaned" arguments (with redirection parts removed)
+ * - stdoutFile: File path for stdout (or null)
+ * - stdoutAppend: Boolean (true if appending '>>')
+ * - stderrFile: File path for stderr (or null)
+ * - stderrAppend: Boolean (true if appending '2>>')
+ */
+function parseRedirection(parts) {
+  const result = {
+    command: null,
+    args: [],
+    stdoutFile: null,
+    stdoutAppend: false,
+    stderrFile: null,
+    stderrAppend: false,
+  };
+
+  let i = 0;
+  while (i < parts.length) {
+    const part = parts[i];
+    let skipNext = false;
+
+    // Check for redirection tokens
+    switch (part) {
+      case '>':
+        result.stdoutFile = parts[i + 1];
+        result.stdoutAppend = false;
+        skipNext = true;
+        break;
+      case '>>':
+        result.stdoutFile = parts[i + 1];
+        result.stdoutAppend = true;
+        skipNext = true;
+        break;
+      case '2>':
+        result.stderrFile = parts[i + 1];
+        result.stderrAppend = false;
+        skipNext = true;
+        break;
+      case '2>>':
+        result.stderrFile = parts[i + 1];
+        result.stderrAppend = true;
+        skipNext = true;
+        break;
+      default:
+        // This part is not a redirection token
+        if (result.command === null) {
+          result.command = part;
+        } else {
+          result.args.push(part);
+        }
+    }
+
+    if (skipNext) {
+      i += 2; // Skip this token and the filename
+      if (i > parts.length) {
+        // Handle syntax error: 'ls >' with nothing after
+        // (For now, we'll just ignore it, but a real shell would error)
+      }
+    } else {
+      i++;
+    }
+  }
+
+  return result;
+}
 
 /**
  * Checks if a command exists and is a file in the directories
@@ -53,194 +123,148 @@ function findCommandInPath(command) {// defining that the function takes one arg
 }
 
 async function prompt() {
-  rl.question("$ ", /*This is all a callback function*/(answer) => {//it passes the user input as answer
-    
-    const input = answer.trim();//removes whitespaces
+  rl.question("$ ", (answer) => {
 
-    // 1. Handle exit command
+    const input = answer.trim();
+
+    // 1. Handle exit command (this is fine as-is)
     if (input === 'exit' || input === 'exit 0' || input === '0') {
-      rl.close();//closes the readline interface stopping it from listening for any more input
-      process.exit(0);//terminates the entire program
-      return;//stops any more code inside the current callback from running
-    }
-
-    // Split the input into command and arguments
-    //input.split splits the input string into an array of words using white spaces
-    //.filter(p => p.length > 0) removes empty strings
-    const parts = input.split(/\s+/).filter(p => p.length > 0);
-    //here we are dividing the parts into command and arguments
-    const command = parts[0];//since it is an array it takes the first part of the input at index 0 as a command 
-    const args = parts.slice(1);// slice from index 1 and store them as arguments
-
-    if (!command) { // Handle empty input
-      prompt();// calls the prompt() again to show a new $prompt
+      rl.close();
+      process.exit(0);
       return;
     }
+
+    // --- NEW PARSING LOGIC ---
+    const parts = input.split(/\s+/).filter(p => p.length > 0);
+
+    // Parse the parts for redirection and clean args
+    const parsed = parseRedirection(parts);
+
+    const {
+      command,
+      args,
+      stdoutFile,
+      stdoutAppend,
+      stderrFile,
+      stderrAppend
+    } = parsed;
+
+    if (!command) { // Handle empty input
+      prompt();
+      return;
+    }
+    // --- END NEW PARSING LOGIC ---
+
+
     // 2. Handle 'echo' command (Built-in)
+    //    NOTE: This will NOT work with redirection yet! (See Step 4)
     if (command === 'echo') {
       console.log(args.join(' '));
-      prompt();// go back to prompting immediately
-    }
-
-    // 3. Handle 'type' command (Built-in)
-    else if (command === 'type') {
-      const targetCommand = args[0];
-      let output;
-
-      if (!targetCommand) {
-        output = "type: missing argument";
-      } 
-      else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type' || targetCommand ==='pwd' || targetCommand === 'cat') {
-        output = `${targetCommand} is a shell builtin`;
-      } else {
-        //if the target command is not an inbuilt it uses the findCommandInPath function earlier made to search for its path
-        //it then stores this path into a variable fullPath
-        const fullPath = findCommandInPath(targetCommand);
-        //if found in the files it will be displayed if not an error message will show
-        if (fullPath) {
-          output = `${targetCommand} is ${fullPath}`;
-        } else {
-          output = `${targetCommand}: not found`;
-        }
-      }
-      console.log(output);
       prompt();
     }
 
-    else if (command === "pwd"){
+    // 3. Handle 'type' command (Built-in)
+    //    (This doesn't need redirection)
+    else if (command === 'type') {
+      // ... your existing type logic (it's fine) ...
+      // Remember to use 'args[0]' for the targetCommand
+      const targetCommand = args[0];
+      // ...
+      prompt();
+    }
+
+    // 4. Handle 'pwd' command (Built-in)
+    //    NOTE: This will NOT work with redirection yet! (See Step 4)
+    else if (command === "pwd") {
       console.log(process.cwd());
       prompt();
     }
 
-    // 4. Handle 'cd' command (Built-in)
+    // 5. Handle 'cd' command (Built-in)
+    //    (This doesn't need redirection)
     else if (command === "cd") {
-
-      let targetDir;
-
-      // We store the original argument for error messages
-      // If no arg is given (just 'cd'), we treat it as '~'
-      const originalArg = args[0] || '~';
-
-      // 1. Decide on the target directory
-      if (!args[0] || args[0] === '~') {
-        // User typed 'cd' or 'cd ~'
-        targetDir = process.env.HOME;
-        // A safe fallback if HOME isn't set
-        if (!targetDir) {
-          targetDir = require('os').homedir();
-        }
-      } else {
-        // User typed 'cd /some/other/path'
-        targetDir = args[0];
-      }
-
-      // 2. Try to change directory
-      try {
-        if (!targetDir) {
-          // This can happen if HOME isn't set and os.homedir() fails
-          throw new Error('Home directory not found');
-        }
-        process.chdir(targetDir);
-      }
-      // 3. Handle errors
-      catch (err) {
-        // Use the 'originalArg' to show the user what failed
-        switch (err.code) {
-          case 'ENOENT':
-            console.log(`cd: ${originalArg}: No such file or directory`);
-            break;
-          case 'ENOTDIR':
-            console.log(`cd: ${originalArg}: Not a directory`);
-            break;
-          default:
-            // For permission errors or 'Home directory not found'
-            console.log(`cd: ${err.message}`);
-        }
-      }
-
-      // 4. Call prompt() ONCE at the end
+      // ... your existing cd logic (it's fine) ...
+      // Remember to use 'args[0]' for the targetDir
+      // ...
       prompt();
     }
 
-    else if(command === 'cat'){
-      //get the file path from the arguments
-      const filePath = args[0];
-
-      //check if file path is provided
-      if(!filePath){
-        prompt();
-        return;
-      }
-
-
-      fs.readFile(pathdir, 'utf8', (err,data) =>{
-        if(err){
-          // console.error('Error reading file', err)
-          console.error(`cat: ${filePath}: No such file or directory`);
-        }else{
-          console.error(`cat: Error reading file: ${err.message}`);
-        }
-        prompt();
-        return;
-      })
-      console.log(data);
-      prompt();
+    // 6. Handle 'cat' command (Built-in)
+    //    NOTE: This will NOT work with redirection yet! (See Step 4)
+    else if (command === 'cat') {
+      // ... your existing cat logic ...
+      // Remember to use 'args[0]' for filePath
+      // ...
+      // AND you must call prompt() inside the async callback
     }
 
-    // if(args.contain('>' || '1>')){
-    //   var access = fs.createWriteStream(pathdir);
-    //   process.stdout.write = process.stderr.write = access.write.bind(access);
-    //   process.on('uncaughtException', function(err){
-    //     console.error((err && err.stack) ? err.stack : err);
-    //   })
-    // }
-
-    // 5. Handle External Commands (Non-built-ins)
+    // 7. Handle External Commands (Non-built-ins)
+    //    THIS IS WHERE WE IMPLEMENT REDIRECTION
     else {
 
       const fullPath = findCommandInPath(command);
 
       if (fullPath) {
-        // --- EXECUTE EXTERNAL COMMAND ASYNCHRONOUSLY ---
+        // --- NEW REDIRECTION LOGIC FOR SPAWN ---
+
+        // Default stdio is to inherit from our shell
+        let stdio = ['inherit', 'inherit', 'inherit']; // [stdin, stdout, stderr]
+        let stdoutFd = null; // File descriptor for stdout
+        let stderrFd = null; // File descriptor for stderr
+
         try {
-          // Spawn the process using the full path.
-          // Pass args (argv[1] onwards) directly.
-          const child = spawn(fullPath, args, {//spawn is where the external program is executed
-            stdio: 'inherit',//It tells the child process to "inherit" the standard
-            // input, output, and error streams from the parent (our shell)
-            //Sets the program name (argv[0]) 
-            // seen by the child process to the user-typed command 
-            // (e.g., custom_exe_4701) instead of the full path 
-            // (e.g., /tmp/bar/custom_exe_4701).
+          // --- Set up stdout ---
+          if (stdoutFile) {
+            const flags = stdoutAppend ? 'a' : 'w'; // 'a' for append, 'w' for write
+            // Open the file and get a file descriptor (a number)
+            stdoutFd = fs.openSync(stdoutFile, flags);
+            stdio[1] = stdoutFd; // Tell spawn to write stdout to this file
+          }
+
+          // --- Set up stderr ---
+          if (stderrFile) {
+            const flags = stderrAppend ? 'a' : 'w';
+            stderrFd = fs.openSync(stderrFile, flags);
+            stdio[2] = stderrFd; // Tell spawn to write stderr to this file
+          }
+
+          // Spawn the process
+          const child = spawn(fullPath, args, {
+            stdio: stdio, // Use our new stdio array
             argv0: command
           });
 
-          // Wait for the child process to finish before prompting again
-          //Asynchronous Wait: The shell must wait for the external command to finish. 
-          //The 'close' event fires when the child process exits, 
-          //and only then is prompt() called to display the $ prompt again.
+          // Wait for the child process to finish
           child.on('close', (code) => {
-            // The prompt returns only after the external command exits.
+            // --- CRITICAL: Close the file descriptors ---
+            // If we don't do this, we'll have file leaks
+            if (stdoutFd !== null) {
+              fs.closeSync(stdoutFd);
+            }
+            if (stderrFd !== null) {
+              fs.closeSync(stderrFd);
+            }
+            // Now, we can prompt again
             prompt();
           });
 
-          // Handle errors like spawning failure (e.g., permissions issue)
           child.on('error', (err) => {
+            // ... (close FDs here too, just in case)
+            if (stdoutFd !== null) fs.closeSync(stdoutFd);
+            if (stderrFd !== null) fs.closeSync(stderrFd);
             console.error(`Error executing ${command}: ${err.message}`);
             prompt();
           });
 
         } catch (e) {
-          // Catch synchronous errors during the spawn call itself
-          console.error(`Failed to execute ${command}: ${e.message}`);
+          // This catches errors from fs.openSync (e.g., permissions)
+          console.error(`Redirection error: ${e.message}`);
+          if (stdoutFd !== null) fs.closeSync(stdoutFd);
+          if (stderrFd !== null) fs.closeSync(stderrFd);
           prompt();
         }
 
-      } 
-      
-      
-      else {
-        // Command not found in built-ins or PATH
+      } else {
         console.log(`${command}: command not found`);
         prompt();
       }
