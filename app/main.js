@@ -142,7 +142,7 @@ async function prompt() {
     }
 
     // --- PARSE FOR REDIRECTION ---
-    const parts = input.split(/\s+/).filter(p => p.length > 0);
+    const parts = input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
     const parsed = parseRedirection(parts);
     const {
       command,
@@ -159,28 +159,6 @@ async function prompt() {
     }
 
     // --- BUILT-IN COMMANDS ---
-
-    // // 2. Handle 'echo' command
-    // if (command === 'echo') {
-    //   const output = args.join(' ') + '\n';
-
-    //   if (stdoutFile) {
-    //     const flags = stdoutAppend ? 'a' : 'w';
-    //     try {
-    //       fs.writeFileSync(stdoutFile, output, { flag: flags });
-    //     } catch (e) {
-    //       console.error(`Shell error: ${e.message}`);
-    //     }
-    //   } else {
-    //     // Write to standard output (the screen)
-    //     process.stdout.write(output);
-    //   }
-
-    //   // (You'd also add a check for stderrFile if echo could produce errors)
-    //   prompt();
-    // }
-
-    // 2. Handle 'echo' command
     // 2. Handle 'echo' command
     else if (command === 'echo') {
 
