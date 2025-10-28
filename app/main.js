@@ -44,6 +44,10 @@ function findCommandInPath(command) {
  * - stderrFile: File path for stderr (or null)
  * - stderrAppend: Boolean (true if appending '2>>')
  */
+/**
+ * Parses a list of command parts for redirection tokens.
+ * (This version adds support for '1>' and '1>>')
+ */
 function parseRedirection(parts) {
   const result = {
     command: null,
@@ -61,11 +65,13 @@ function parseRedirection(parts) {
 
     switch (part) {
       case '>':
+      case '1>': // <-- ADDED THIS CASE
         result.stdoutFile = parts[i + 1];
         result.stdoutAppend = false;
         skipNext = true;
         break;
       case '>>':
+      case '1>>': // <-- ADDED THIS CASE (for completeness)
         result.stdoutFile = parts[i + 1];
         result.stdoutAppend = true;
         skipNext = true;
@@ -178,7 +184,7 @@ async function prompt() {
       console.log(args.join(' '));
       prompt();
     }
-    
+
     // 3. Handle 'type' command
     else if (command === 'type') {
       const targetCommand = args[0];
