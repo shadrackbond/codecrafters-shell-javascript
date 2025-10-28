@@ -248,27 +248,44 @@ async function prompt() {
     }
 
     // cat
+    // cat (multi-file support)
     else if (command === 'cat') {
-      const filePath = args[0];
-      if (!filePath) {
+      if (args.length === 0) {
         prompt();
         return;
       }
 
-      fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-          let errorMsg;
-          if (err.code === 'ENOENT') {
-            errorMsg = `cat: ${filePath}: No such file or directory\n`;
-          } else {
-            errorMsg = `cat: Error reading file: ${err.message}\n`;
-          }
-          writeOutput(errorMsg, stderrFile, stderrAppend, true);
-        } else {
-          writeOutput(data, stdoutFile, stdoutAppend, false);
+      let index = 0;
+
+      function readNext() {
+        if (index >= args.length) {
+          // all done
+          prompt();
+          return;
         }
-        prompt();
-      });
+
+        const filePath = args[index];
+        index++;
+
+        fs.readFile(filePath, 'utf8', (err, data) => {
+          if (err) {
+            let errorMsg;
+            if (err.code === 'ENOENT') {
+              errorMsg = `cat: ${filePath}: No such file or directory\n`;
+            } else {
+              errorMsg = `cat: Error reading file: ${err.message}\n`;
+            }
+            writeOutput(errorMsg, stderrFile, stderrAppend, true);
+          } else {
+            writeOutput(data, stdoutFile, stdoutAppend, false);
+          }
+
+          // Continue to next file after handling current one
+          readNext();
+        });
+      }
+
+      readNext();
     }
 
     // --- External commands ---
