@@ -186,7 +186,7 @@ async function prompt() {
         output = "type: missing argument\n";
         isError = true;
       }
-      else if (['echo', 'exit', 'type', 'pwd', 'cat', 'cd'].includes(targetCommand)) {
+      else if (['echo', 'exit', 'type', 'pwd', 'cd'].includes(targetCommand)) {
         output = `${targetCommand} is a shell builtin\n`;
       } else {
         const fullPath = findCommandInPath(targetCommand);
