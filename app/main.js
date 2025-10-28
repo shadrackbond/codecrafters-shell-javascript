@@ -142,6 +142,17 @@ async function prompt() {
       });
       const output = cleanedArgs.join(' ') + '\n';
       writeOutput(output, stdoutFile, stdoutAppend, false);
+
+      // Create stderr file if specified (even if empty)
+      if (stderrFile) {
+        ensureParentDir(stderrFile);
+        try {
+          fs.closeSync(fs.openSync(stderrFile, 'a'));
+        } catch (e) {
+          console.error(`Shell error touching ${stderrFile}: ${e.message}`);
+        }
+      }
+
       return prompt();
     }
 
