@@ -2,7 +2,7 @@ const readline = require("readline");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
-const os = require("os"); // Needed for 'cd' home directory
+const os = require("os");
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -15,7 +15,7 @@ const rl = readline.createInterface({
  */
 function findCommandInPath(command) {
   if (!process.env.PATH) return null;
-  const pathDirs = process.env.PATH.split(":").filter(p => p.length > 0);
+  const pathDirs = process.env.PATH.split(path.delimiter).filter(p => p.length > 0);
 
   for (const dir of pathDirs) {
     const filePath = path.join(dir, command);
@@ -36,17 +36,7 @@ function findCommandInPath(command) {
 
 /**
  * Parses a list of command parts for redirection tokens.
- * @returns {object} An object containing:
- * - command: The command (first part)
- * - args: An array of "cleaned" arguments (with redirection parts removed)
- * - stdoutFile: File path for stdout (or null)
- * - stdoutAppend: Boolean (true if appending '>>')
- * - stderrFile: File path for stderr (or null)
- * - stderrAppend: Boolean (true if appending '2>>')
- */
-/**
- * Parses a list of command parts for redirection tokens.
- * (This version adds support for '1>' and '1>>')
+ * (Supports >, >>, 1>, 1>>, 2>, 2>>)
  */
 function parseRedirection(parts) {
   const result = {
@@ -65,23 +55,39 @@ function parseRedirection(parts) {
 
     switch (part) {
       case '>':
-      case '1>': // <-- ADDED THIS CASE
+      case '1>':
+        if (!parts[i + 1]) {
+          console.error(`Redirection error: missing filename after ${part}`);
+          return result;
+        }
         result.stdoutFile = parts[i + 1];
         result.stdoutAppend = false;
         skipNext = true;
         break;
       case '>>':
-      case '1>>': // <-- ADDED THIS CASE (for completeness)
+      case '1>>':
+        if (!parts[i + 1]) {
+          console.error(`Redirection error: missing filename after ${part}`);
+          return result;
+        }
         result.stdoutFile = parts[i + 1];
         result.stdoutAppend = true;
         skipNext = true;
         break;
       case '2>':
+        if (!parts[i + 1]) {
+          console.error(`Redirection error: missing filename after ${part}`);
+          return result;
+        }
         result.stderrFile = parts[i + 1];
         result.stderrAppend = false;
         skipNext = true;
         break;
       case '2>>':
+        if (!parts[i + 1]) {
+          console.error(`Redirection error: missing filename after ${part}`);
+          return result;
+        }
         result.stderrFile = parts[i + 1];
         result.stderrAppend = true;
         skipNext = true;
@@ -95,7 +101,7 @@ function parseRedirection(parts) {
     }
 
     if (skipNext) {
-      i += 2; // Skip this token and the filename
+      i += 2;
     } else {
       i++;
     }
@@ -105,16 +111,12 @@ function parseRedirection(parts) {
 
 /**
  * Writes output to the correct destination (file or console).
- * @param {string} data - The data to write.
- * @param {string | null} file - The file path (e.g., stdoutFile or stderrFile).
- * @param {boolean} append - Whether to append.
- * @param {boolean} isError - If true, write to process.stderr, otherwise process.stdout.
  */
 function writeOutput(data, file, append, isError = false) {
   try {
     if (file) {
-      const flags = append ? 'a' : 'w'; // 'a' for append, 'w' for write
-      fs.writeFileSync(file, data, { flag: flags });
+      const flags = append ? 'a' : 'w';
+      fs.writeFileSync(file, data, { flags });
     } else {
       if (isError) {
         process.stderr.write(data);
@@ -123,25 +125,24 @@ function writeOutput(data, file, append, isError = false) {
       }
     }
   } catch (e) {
-    // This error goes to the shell's stderr, regardless
-    console.error(`Shell error writing to ${file}: ${e.message}`);
+    // Always report file write errors to the shell's stderr
+    process.stderr.write(`Shell error writing to ${file}: ${e.message}\n`);
   }
 }
-
 
 async function prompt() {
   rl.question("$ ", (answer) => {
 
     const input = answer.trim();
 
-    // 1. Handle exit command
+    // Exit commands
     if (input === 'exit' || input === 'exit 0' || input === '0') {
       rl.close();
       process.exit(0);
       return;
     }
 
-    // --- PARSE FOR REDIRECTION ---
+    // Parse redirection
     const parts = input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
     const parsed = parseRedirection(parts);
     const {
@@ -153,77 +154,62 @@ async function prompt() {
       stderrAppend
     } = parsed;
 
-    if (!command) { // Handle empty input
+    if (!command) {
       prompt();
       return;
     }
 
-    // --- BUILT-IN COMMANDS ---
-    // 2. Handle 'echo' command
-    else if (command === 'echo') {
+    // --- Built-in commands ---
 
-      // Clean quotes from arguments
+    // echo
+    if (command === 'echo') {
       const cleanedArgs = args.map(arg => {
-        if ((arg.startsWith("'") && arg.endsWith("'")) || (arg.startsWith('"') && arg.endsWith('"'))) {
-          // It's a quoted string, so return the inner part
+        if ((arg.startsWith("'") && arg.endsWith("'")) ||
+          (arg.startsWith('"') && arg.endsWith('"'))) {
           return arg.substring(1, arg.length - 1);
         }
-        // It's not a quoted string, return it as-is
         return arg;
       });
 
-      // Join the *cleaned* arguments
       const output = cleanedArgs.join(' ') + '\n';
-
-      // Write to the correct destination (file or console)
       writeOutput(output, stdoutFile, stdoutAppend, false);
-
-      // Go to the next prompt
       prompt();
     }
 
-    // 3. Handle 'type' command
+    // type
     else if (command === 'type') {
       const targetCommand = args[0];
       let output;
       let isError = false;
 
       if (!targetCommand) {
-        output = "type: missing argument";
+        output = "type: missing argument\n";
         isError = true;
       }
-      else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type' || targetCommand === 'pwd' || targetCommand === 'cat' || targetCommand === 'cd') {
-        output = `${targetCommand} is a shell builtin`;
+      else if (['echo', 'exit', 'type', 'pwd', 'cat', 'cd'].includes(targetCommand)) {
+        output = `${targetCommand} is a shell builtin\n`;
       } else {
         const fullPath = findCommandInPath(targetCommand);
         if (fullPath) {
-          output = `${targetCommand} is ${fullPath}`;
+          output = `${targetCommand} is ${fullPath}\n`;
         } else {
-          output = `${targetCommand}: not found`;
+          output = `${targetCommand}: not found\n`;
           isError = true;
         }
       }
 
-      output += '\n';
-
-      if (isError) {
-        writeOutput(output, stderrFile, stderrAppend, true); // Errors go to stderr
-      } else {
-        writeOutput(output, stdoutFile, stdoutAppend, false); // Success goes to stdout
-      }
-
+      writeOutput(output, isError ? stderrFile : stdoutFile, isError ? stderrAppend : stdoutAppend, isError);
       prompt();
     }
 
-    // 4. Handle 'pwd' command
+    // pwd
     else if (command === "pwd") {
       const output = process.cwd() + '\n';
-      // pwd output always goes to stdout
       writeOutput(output, stdoutFile, stdoutAppend, false);
       prompt();
     }
 
-    // 5. Handle 'cd' command
+    // cd
     else if (command === "cd") {
       let targetDir;
       const originalArg = args[0] || '~';
@@ -234,6 +220,10 @@ async function prompt() {
         targetDir = args[0];
       }
 
+      if (targetDir.startsWith('~/')) {
+        targetDir = path.join(os.homedir(), targetDir.slice(2));
+      }
+
       try {
         if (!targetDir) {
           throw new Error('Home directory not found');
@@ -241,7 +231,6 @@ async function prompt() {
         process.chdir(targetDir);
       }
       catch (err) {
-        // 'cd' has no stdout, only stderr
         let errorMsg;
         switch (err.code) {
           case 'ENOENT':
@@ -258,16 +247,14 @@ async function prompt() {
       prompt();
     }
 
-    // 6. Handle 'cat' command
+    // cat
     else if (command === 'cat') {
       const filePath = args[0];
       if (!filePath) {
-        // A real 'cat' would read from stdin, we'll just return
         prompt();
         return;
       }
 
-      // fs.readFile is async, so prompt() must be called inside the callback
       fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) {
           let errorMsg;
@@ -276,50 +263,42 @@ async function prompt() {
           } else {
             errorMsg = `cat: Error reading file: ${err.message}\n`;
           }
-          // 'cat' errors go to stderr
           writeOutput(errorMsg, stderrFile, stderrAppend, true);
         } else {
-          // 'cat' data goes to stdout
           writeOutput(data, stdoutFile, stdoutAppend, false);
         }
-        // IMPORTANT: Call prompt *after* the async operation is done
         prompt();
       });
     }
 
-    // --- EXTERNAL COMMANDS ---
+    // --- External commands ---
     else {
       const fullPath = findCommandInPath(command);
 
       if (fullPath) {
-        let stdio = ['inherit', 'inherit', 'inherit']; // [stdin, stdout, stderr]
+        let stdio = ['inherit', 'inherit', 'inherit'];
         let stdoutFd = null;
         let stderrFd = null;
 
         try {
-          // --- Set up stdout ---
           if (stdoutFile) {
             const flags = stdoutAppend ? 'a' : 'w';
             stdoutFd = fs.openSync(stdoutFile, flags);
             stdio[1] = stdoutFd;
           }
 
-          // --- Set up stderr ---
           if (stderrFile) {
             const flags = stderrAppend ? 'a' : 'w';
             stderrFd = fs.openSync(stderrFile, flags);
             stdio[2] = stderrFd;
           }
 
-          // Spawn the child process
           const child = spawn(fullPath, args, {
-            stdio: stdio,
+            stdio,
             argv0: command
           });
 
-          // Wait for the child process to finish
           child.on('close', (code) => {
-            // --- CRITICAL: Close the file descriptors ---
             if (stdoutFd !== null) fs.closeSync(stdoutFd);
             if (stderrFd !== null) fs.closeSync(stderrFd);
             prompt();
@@ -328,14 +307,11 @@ async function prompt() {
           child.on('error', (err) => {
             if (stdoutFd !== null) fs.closeSync(stdoutFd);
             if (stderrFd !== null) fs.closeSync(stderrFd);
-            // This is an error *executing* the command (e.g., permissions)
-            // It goes to our shell's stderr
             writeOutput(`Error executing ${command}: ${err.message}\n`, stderrFile, stderrAppend, true);
             prompt();
           });
 
         } catch (e) {
-          // This catches synchronous errors (e.g., fs.openSync)
           if (stdoutFd !== null) fs.closeSync(stdoutFd);
           if (stderrFd !== null) fs.closeSync(stderrFd);
           writeOutput(`Shell error: ${e.message}\n`, stderrFile, stderrAppend, true);
@@ -343,7 +319,6 @@ async function prompt() {
         }
 
       } else {
-        // 7. Command not found
         const errorMsg = `${command}: command not found\n`;
         writeOutput(errorMsg, stderrFile, stderrAppend, true);
         prompt();
