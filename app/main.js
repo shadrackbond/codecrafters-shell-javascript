@@ -11,8 +11,15 @@ const rl = readline.createInterface({
   output: process.stdout,
   completer: (line) => {
     const matches = builtins.filter((b) => b.startsWith(line));
+
+    // If exactly one match, auto-complete and add a space
+    if (matches.length === 1) {
+      return [[matches[0] + " "], line];
+    }
+
     return [matches.length ? matches : builtins, line];
   },
+
 });
 
 function prompt() {
