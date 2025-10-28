@@ -180,8 +180,26 @@ async function prompt() {
     //   prompt();
     // }
 
-    if (command === 'echo') {
-      console.log(args.join(' '));
+    // 2. Handle 'echo' command
+    else if (command === 'echo') {
+
+      // NEW: Clean quotes from arguments
+      const cleanedArgs = args.map(arg => {
+        if ((arg.startsWith("'") && arg.endsWith("'")) || (arg.startsWith('"') && arg.endsWith('"'))) {
+          // It's a quoted string, so return the inner part
+          return arg.substring(1, arg.length - 1);
+        }
+        // It's not a quoted string, return it as-is
+        return arg;
+      });
+
+      // Join the *cleaned* arguments
+      const output = cleanedArgs.join(' ') + '\n';
+
+      // This part stays the same: write to file if stdoutFile is set
+      writeOutput(output, stdoutFile, stdoutAppend, false);
+
+      // Go to the next prompt
       prompt();
     }
 
