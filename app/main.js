@@ -90,7 +90,7 @@ async function prompt() {
       if (!targetCommand) {
         output = "type: missing argument";
       } 
-      else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type' || targetCommand ==='pwd') {
+      else if (targetCommand === 'echo' || targetCommand === 'exit' || targetCommand === 'type' || targetCommand ==='pwd' || targetCommand === 'cat') {
         output = `${targetCommand} is a shell builtin`;
       } else {
         //if the target command is not an inbuilt it uses the findCommandInPath function earlier made to search for its path
@@ -161,6 +161,39 @@ async function prompt() {
       // 4. Call prompt() ONCE at the end
       prompt();
     }
+
+    else if(command === 'cat'){
+      //get the file path from the arguments
+      const filePath = args[0];
+
+      //check if file path is provided
+      if(!filePath){
+        prompt();
+        return;
+      }
+
+
+      fs.readFile(pathdir, 'utf8', (err,data) =>{
+        if(err){
+          // console.error('Error reading file', err)
+          console.error(`cat: ${filePath}: No such file or directory`);
+        }else{
+          console.error(`cat: Error reading file: ${err.message}`);
+        }
+        prompt();
+        return;
+      })
+      console.log(data);
+      prompt();
+    }
+
+    // if(args.contain('>' || '1>')){
+    //   var access = fs.createWriteStream(pathdir);
+    //   process.stdout.write = process.stderr.write = access.write.bind(access);
+    //   process.on('uncaughtException', function(err){
+    //     console.error((err && err.stack) ? err.stack : err);
+    //   })
+    // }
 
     // 5. Handle External Commands (Non-built-ins)
     else {
