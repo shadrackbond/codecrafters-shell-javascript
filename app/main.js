@@ -235,26 +235,32 @@ async function prompt() {
     }
 
     // ------------------ BUILT-IN: cat ------------------
-    if (command === "cat") {
-      const filePath = args[0];
-      if (!filePath) return prompt();
+    // ------------------ BUILT-IN: cat ------------------
+    if (command === 'cat') {
+      if (args.length === 0) return prompt();
 
-      fs.readFile(filePath, "utf8", (err, data) => {
-        if (err) {
-          let errorMsg;
-          if (err.code === "ENOENT") {
-            errorMsg = `cat: ${filePath}: No such file or directory\n`;
+      let combinedOutput = '';
+      let combinedError = '';
+
+      for (const filePath of args) {
+        try {
+          const data = fs.readFileSync(filePath, 'utf8');
+          combinedOutput += data;
+          if (!data.endsWith('\n')) combinedOutput += '\n';
+        } catch (err) {
+          if (err.code === 'ENOENT') {
+            combinedError += `cat: ${filePath}: No such file or directory\n`;
           } else {
-            errorMsg = `cat: Error reading file: ${err.message}\n`;
+            combinedError += `cat: Error reading file: ${err.message}\n`;
           }
-          writeOutput(errorMsg, stderrFile, stderrAppend, true);
-        } else {
-          writeOutput(data, stdoutFile, stdoutAppend, false);
         }
-        prompt();
-      });
-      return;
+      }
+
+      if (combinedOutput) writeOutput(combinedOutput, stdoutFile, stdoutAppend, false);
+      if (combinedError) writeOutput(combinedError, stderrFile, stderrAppend, true);
+      return prompt();
     }
+
 
     // ------------------ EXTERNAL COMMANDS ------------------
     const fullPath = findCommandInPath(command);
