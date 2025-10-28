@@ -100,7 +100,7 @@ function writeOutput(data, file, append, isError = false) {
     if (file) {
       ensureParentDir(file);
       const flags = append ? 'a' : 'w';
-      fs.writeFileSync(file, data, { flags });
+      fs.writeFileSync(file, data, { flag: flags }); // <-- FIX: use "flag", not "flags"
     } else {
       if (isError) process.stderr.write(data);
       else process.stdout.write(data);
@@ -109,6 +109,7 @@ function writeOutput(data, file, append, isError = false) {
     console.error(`Shell error writing to ${file}: ${e.message}`);
   }
 }
+
 
 // ---------- Main Prompt ----------
 
