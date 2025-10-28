@@ -1,149 +1,318 @@
-#!/usr/bin/env node
 const readline = require("readline");
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
+const { spawn } = require("child_process");
+const os = require("os"); // For cd ~ expansion
 
+// ------------------ BUILT-INS ------------------
+const builtins = ["echo", "exit", "type", "pwd", "cd", "cat"];
+
+// ------------------ SIMPLE COMPLETER ------------------
+function completer(line) {
+  const hits = builtins.filter(cmd => cmd.startsWith(line));
+  if (hits.length === 1) {
+    // ✅ Add trailing space when only one match
+    return [[hits[0] + " "], line];
+  }
+  return [hits.length ? hits : builtins, line];
+}
+
+// ------------------ READLINE SETUP ------------------
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  completer: completer
+  completer,
 });
 
-const builtins = ["echo", "exit", "type", "pwd", "cd"];
-
-function completer(line) {
-  const completions = builtins.filter(cmd => cmd.startsWith(line));
-  if (completions.length === 1) {
-    return [[completions[0] + " "], line];
-  }
-  return [[], line];
+// ------------------ HELPERS ------------------
+function ensureParentDir(file) {
+  const dir = path.dirname(file);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-function parseRedirection(tokens) {
-  let stdoutPath = null, stderrPath = null;
-  let appendStdout = false, appendStderr = false;
-  const filtered = [];
+function findCommandInPath(command) {
+  if (!process.env.PATH) return null;
+  const pathDirs = process.env.PATH.split(":").filter(p => p.length > 0);
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-    if (token === ">" || token === "1>") {
-      stdoutPath = tokens[i + 1];
-      appendStdout = false;
-      i++;
-    } else if (token === ">>" || token === "1>>") {
-      stdoutPath = tokens[i + 1];
-      appendStdout = true;
-      i++;
-    } else if (token === "2>") {
-      stderrPath = tokens[i + 1];
-      appendStderr = false;
-      i++;
-    } else if (token === "2>>") {
-      stderrPath = tokens[i + 1];
-      appendStderr = true;
-      i++;
-    } else {
-      filtered.push(token);
-    }
-  }
-
-  return { filtered, stdoutPath, stderrPath, appendStdout, appendStderr };
-}
-
-function redirectOutput(stdoutData, stderrData, stdoutPath, stderrPath, appendStdout, appendStderr) {
-  try {
-    if (stdoutPath) {
-      fs.writeFileSync(stdoutPath, stdoutData, { flag: appendStdout ? "a" : "w" });
-    } else if (stdoutData) {
-      process.stdout.write(stdoutData);
-    }
-
-    if (stderrPath) {
-      fs.writeFileSync(stderrPath, stderrData, { flag: appendStderr ? "a" : "w" });
-    } else if (stderrData) {
-      process.stderr.write(stderrData);
-    }
-  } catch (err) {
-    console.error("Redirection error:", err);
-  }
-}
-
-function runCommand(input) {
-  input = input.trim();
-  if (!input) return;
-
-  const tokens = input.split(/\s+/);
-  const { filtered, stdoutPath, stderrPath, appendStdout, appendStderr } = parseRedirection(tokens);
-  const cmd = filtered[0];
-  const args = filtered.slice(1);
-
-  let stdoutData = "";
-  let stderrData = "";
-
-  if (cmd === "exit") {
-    rl.close();
-    process.exit(0);
-  }
-
-  else if (cmd === "echo") {
-    stdoutData = args.join(" ") + "\n";
-  }
-
-  else if (cmd === "pwd") {
-    stdoutData = process.cwd() + "\n";
-  }
-
-  else if (cmd === "cd") {
-    const targetDir = args[0] || process.env.HOME;
+  for (const dir of pathDirs) {
+    const filePath = path.join(dir, command);
     try {
-      process.chdir(targetDir);
-    } catch (err) {
-      stderrData = `cd: ${targetDir}: No such file or directory\n`;
-    }
-  }
-
-  else if (cmd === "type") {
-    const target = args[0];
-    if (builtins.includes(target)) {
-      stdoutData = `${target} is a shell builtin\n`;
-    } else {
-      const resolved = process.env.PATH.split(":")
-        .map(p => path.join(p, target))
-        .find(p => fs.existsSync(p));
-      stdoutData = resolved ? `${target} is ${resolved}\n` : `${target}: not found\n`;
-    }
-  }
-
-  else if (cmd === "cat") {
-    if (args.length === 0) return;
-
-    for (const file of args) {
-      try {
-        const content = fs.readFileSync(file, "utf8");
-        stdoutData += content.endsWith("\n") ? content : content + "\n";
-      } catch (err) {
-        stderrData += `cat: ${file}: No such file or directory\n`;
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+        if (stats.isFile()) {
+          fs.accessSync(filePath, fs.constants.X_OK);
+          return filePath;
+        }
       }
+    } catch {
+      // ignore
     }
   }
-
-  else {
-    const external = spawnSync(cmd, args, { encoding: "utf8" });
-    stdoutData = external.stdout || "";
-    stderrData = external.stderr || "";
-    if (external.error && external.error.code === "ENOENT") {
-      stderrData = `${cmd}: command not found\n`;
-    }
-  }
-
-  redirectOutput(stdoutData, stderrData, stdoutPath, stderrPath, appendStdout, appendStderr);
+  return null;
 }
 
-function prompt() {
-  rl.question("$ ", line => {
-    runCommand(line);
-    prompt();
+function parseRedirection(parts) {
+  const result = {
+    command: null,
+    args: [],
+    stdoutFile: null,
+    stdoutAppend: false,
+    stderrFile: null,
+    stderrAppend: false,
+  };
+
+  let i = 0;
+  while (i < parts.length) {
+    const part = parts[i];
+    let skipNext = false;
+
+    switch (part) {
+      case ">":
+      case "1>":
+        result.stdoutFile = parts[i + 1];
+        result.stdoutAppend = false;
+        skipNext = true;
+        break;
+      case ">>":
+      case "1>>":
+        result.stdoutFile = parts[i + 1];
+        result.stdoutAppend = true;
+        skipNext = true;
+        break;
+      case "2>":
+        result.stderrFile = parts[i + 1];
+        result.stderrAppend = false;
+        skipNext = true;
+        break;
+      case "2>>":
+        result.stderrFile = parts[i + 1];
+        result.stderrAppend = true;
+        skipNext = true;
+        break;
+      default:
+        if (result.command === null) {
+          result.command = part;
+        } else {
+          result.args.push(part);
+        }
+    }
+
+    if (skipNext) i += 2;
+    else i++;
+  }
+  return result;
+}
+
+function writeOutput(data, file, append, isError = false) {
+  try {
+    if (file) {
+      ensureParentDir(file);
+      const flags = append ? "a" : "w";
+      fs.writeFileSync(file, data, { flag: flags });
+    } else {
+      if (isError) process.stderr.write(data);
+      else process.stdout.write(data);
+    }
+  } catch (e) {
+    console.error(`Shell error writing to ${file}: ${e.message}`);
+  }
+}
+
+// ------------------ MAIN PROMPT ------------------
+async function prompt() {
+  rl.question("$ ", (answer) => {
+    const input = answer.trim();
+    if (!input) return prompt();
+
+    if (input === "exit" || input === "exit 0" || input === "0") {
+      rl.close();
+      process.exit(0);
+      return;
+    }
+
+    const parts = input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+    const parsed = parseRedirection(parts);
+    const {
+      command,
+      args,
+      stdoutFile,
+      stdoutAppend,
+      stderrFile,
+      stderrAppend,
+    } = parsed;
+
+    // ------------------ BUILT-IN: echo ------------------
+    if (command === "echo") {
+      const cleanedArgs = args.map((arg) => {
+        if (
+          (arg.startsWith('"') && arg.endsWith('"')) ||
+          (arg.startsWith("'") && arg.endsWith("'"))
+        ) {
+          return arg.slice(1, -1);
+        }
+        return arg;
+      });
+      const output = cleanedArgs.join(" ") + "\n";
+      writeOutput(output, stdoutFile, stdoutAppend, false);
+
+      // Touch stderr file if redirected
+      if (stderrFile) {
+        ensureParentDir(stderrFile);
+        try {
+          fs.closeSync(fs.openSync(stderrFile, "a"));
+        } catch (e) {
+          console.error(`Shell error touching ${stderrFile}: ${e.message}`);
+        }
+      }
+
+      return prompt();
+    }
+
+    // ------------------ BUILT-IN: type ------------------
+    if (command === "type") {
+      const targetCommand = args[0];
+      let output;
+      let isError = false;
+
+      if (!targetCommand) {
+        output = "type: missing argument\n";
+        isError = true;
+      } else if (builtins.includes(targetCommand)) {
+        output = `${targetCommand} is a shell builtin\n`;
+      } else {
+        const fullPath = findCommandInPath(targetCommand);
+        if (fullPath) {
+          output = `${targetCommand} is ${fullPath}\n`;
+        } else {
+          output = `${targetCommand}: not found\n`;
+          isError = true;
+        }
+      }
+
+      writeOutput(
+        output,
+        isError ? stderrFile : stdoutFile,
+        isError ? stderrAppend : stdoutAppend,
+        isError
+      );
+      return prompt();
+    }
+
+    // ------------------ BUILT-IN: pwd ------------------
+    if (command === "pwd") {
+      const output = process.cwd() + "\n";
+      writeOutput(output, stdoutFile, stdoutAppend, false);
+      return prompt();
+    }
+
+    // ------------------ BUILT-IN: cd ------------------
+    if (command === "cd") {
+      let targetDir;
+      const originalArg = args[0] || "~";
+      if (!args[0] || args[0] === "~") {
+        targetDir = process.env.HOME || os.homedir();
+      } else {
+        targetDir = args[0];
+      }
+
+      try {
+        process.chdir(targetDir);
+      } catch (err) {
+        let errorMsg;
+        switch (err.code) {
+          case "ENOENT":
+            errorMsg = `cd: ${originalArg}: No such file or directory\n`;
+            break;
+          case "ENOTDIR":
+            errorMsg = `cd: ${originalArg}: Not a directory\n`;
+            break;
+          default:
+            errorMsg = `cd: ${err.message}\n`;
+        }
+        writeOutput(errorMsg, stderrFile, stderrAppend, true);
+      }
+      return prompt();
+    }
+
+    // ------------------ BUILT-IN: cat ------------------
+    if (command === "cat") {
+      const filePath = args[0];
+      if (!filePath) return prompt();
+
+      fs.readFile(filePath, "utf8", (err, data) => {
+        if (err) {
+          let errorMsg;
+          if (err.code === "ENOENT") {
+            errorMsg = `cat: ${filePath}: No such file or directory\n`;
+          } else {
+            errorMsg = `cat: Error reading file: ${err.message}\n`;
+          }
+          writeOutput(errorMsg, stderrFile, stderrAppend, true);
+        } else {
+          writeOutput(data, stdoutFile, stdoutAppend, false);
+        }
+        prompt();
+      });
+      return;
+    }
+
+    // ------------------ EXTERNAL COMMANDS ------------------
+    const fullPath = findCommandInPath(command);
+    if (fullPath) {
+      let stdio = ["inherit", "inherit", "inherit"];
+      let stdoutFd = null;
+      let stderrFd = null;
+
+      try {
+        if (stdoutFile) {
+          ensureParentDir(stdoutFile);
+          const flags = stdoutAppend ? "a" : "w";
+          stdoutFd = fs.openSync(stdoutFile, flags);
+          stdio[1] = stdoutFd;
+        }
+
+        if (stderrFile) {
+          ensureParentDir(stderrFile);
+          const flags = stderrAppend ? "a" : "w";
+          stderrFd = fs.openSync(stderrFile, flags);
+          stdio[2] = stderrFd;
+        }
+
+        const child = spawn(fullPath, args, { stdio, argv0: command });
+
+        child.on("close", () => {
+          if (stdoutFd !== null) fs.closeSync(stdoutFd);
+          if (stderrFd !== null) fs.closeSync(stderrFd);
+          prompt();
+        });
+
+        child.on("error", (err) => {
+          if (stdoutFd !== null) fs.closeSync(stdoutFd);
+          if (stderrFd !== null) fs.closeSync(stderrFd);
+          writeOutput(
+            `Error executing ${command}: ${err.message}\n`,
+            stderrFile,
+            stderrAppend,
+            true
+          );
+          prompt();
+        });
+      } catch (e) {
+        if (stdoutFd !== null) fs.closeSync(stdoutFd);
+        if (stderrFd !== null) fs.closeSync(stderrFd);
+        writeOutput(
+          `Shell error: ${e.message}\n`,
+          stderrFile,
+          stderrAppend,
+          true
+        );
+        prompt();
+      }
+    } else {
+      const errorMsg = `${command}: command not found\n`;
+      writeOutput(errorMsg, stderrFile, stderrAppend, true);
+      prompt();
+    }
   });
 }
 
