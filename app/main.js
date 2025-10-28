@@ -170,13 +170,20 @@ async function prompt() {
 
     // ------------------ BUILT-IN: type ------------------
     // ------------------ BUILT-IN: type ------------------
+    // ------------------ BUILT-IN: type ------------------
     if (command === 'type') {
       const target = args[0];
       if (!target) return prompt();
 
       const builtins = ['echo', 'exit', 'type', 'pwd', 'cd', 'cat', 'ls'];
 
-      // 1️⃣ Check if executable exists in PATH
+      // ✅ 1️⃣ Check if it's a builtin first
+      if (builtins.includes(target)) {
+        console.log(`${target} is a shell builtin`);
+        return prompt();
+      }
+
+      // ✅ 2️⃣ Otherwise, look through PATH
       const pathDirs = process.env.PATH.split(':');
       for (const dir of pathDirs) {
         const fullPath = path.join(dir, target);
@@ -187,16 +194,11 @@ async function prompt() {
         } catch (_) { }
       }
 
-      // 2️⃣ If not found in PATH, check if builtin
-      if (builtins.includes(target)) {
-        console.log(`${target} is a shell builtin`);
-        return prompt();
-      }
-
       // 3️⃣ Not found
       console.log(`type: ${target}: not found`);
       return prompt();
     }
+
 
 
     // ------------------ BUILT-IN: pwd ------------------
