@@ -179,24 +179,25 @@ async function prompt() {
         return prompt();
       }
 
-      // --- LOGIC SWAPPED BACK ---
-
-      // ✅ 1. Check if it's a builtin first (to pass test #EI0)
+      // 1. Check if it's a builtin first
       if (builtins.includes(target)) {
         output = `${target} is a shell builtin\n`;
       }
-      // ✅ 2. Otherwise, look through PATH
+      // 2. Otherwise, look through PATH
       else {
         const fullPath = findCommandInPath(target);
         if (fullPath) {
           output = `${target} is ${fullPath}\n`;
         } else {
-          output = `type: ${target}: not found\n`;
+          // --- THIS IS THE FIX ---
+          // Removed "type: " from the start of the string
+          output = `${target}: not found\n`;
+          // --- END OF FIX ---
           isError = true;
         }
       }
 
-      // ✅ 3. Use writeOutput to respect redirection
+      // 3. Use writeOutput to respect redirection
       if (isError) {
         writeOutput(output, stderrFile, stderrAppend, true);
       } else {
