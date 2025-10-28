@@ -154,26 +154,31 @@ async function prompt() {
 
     // --- BUILT-IN COMMANDS ---
 
-    // 2. Handle 'echo' command
+    // // 2. Handle 'echo' command
+    // if (command === 'echo') {
+    //   const output = args.join(' ') + '\n';
+
+    //   if (stdoutFile) {
+    //     const flags = stdoutAppend ? 'a' : 'w';
+    //     try {
+    //       fs.writeFileSync(stdoutFile, output, { flag: flags });
+    //     } catch (e) {
+    //       console.error(`Shell error: ${e.message}`);
+    //     }
+    //   } else {
+    //     // Write to standard output (the screen)
+    //     process.stdout.write(output);
+    //   }
+
+    //   // (You'd also add a check for stderrFile if echo could produce errors)
+    //   prompt();
+    // }
+
     if (command === 'echo') {
-      const output = args.join(' ') + '\n';
-
-      if (stdoutFile) {
-        const flags = stdoutAppend ? 'a' : 'w';
-        try {
-          fs.writeFileSync(stdoutFile, output, { flag: flags });
-        } catch (e) {
-          console.error(`Shell error: ${e.message}`);
-        }
-      } else {
-        // Write to standard output (the screen)
-        process.stdout.write(output);
-      }
-
-      // (You'd also add a check for stderrFile if echo could produce errors)
+      console.log(args.join(' '));
       prompt();
     }
-
+    
     // 3. Handle 'type' command
     else if (command === 'type') {
       const targetCommand = args[0];
