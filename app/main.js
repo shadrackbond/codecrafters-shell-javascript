@@ -10,8 +10,7 @@ const rl = readline.createInterface({
 });
 
 /**
- * Checks if a command exists and is a file in the directories
- * specified in the PATH environment variable.
+ * Find a command in $PATH directories.
  */
 function findCommandInPath(command) {
   if (!process.env.PATH) return null;
@@ -28,15 +27,14 @@ function findCommandInPath(command) {
         }
       }
     } catch {
-      // Ignore errors
+      // ignore
     }
   }
   return null;
 }
 
 /**
- * Parses a list of command parts for redirection tokens.
- * (Supports >, >>, 1>, 1>>, 2>, 2>>)
+ * Parse command and redirections.
  */
 function parseRedirection(parts) {
   const result = {
@@ -93,56 +91,46 @@ function parseRedirection(parts) {
         skipNext = true;
         break;
       default:
-        if (result.command === null) {
-          result.command = part;
-        } else {
-          result.args.push(part);
-        }
+        if (result.command === null) result.command = part;
+        else result.args.push(part);
     }
 
-    if (skipNext) {
-      i += 2;
-    } else {
-      i++;
-    }
+    i += skipNext ? 2 : 1;
   }
   return result;
 }
 
 /**
- * Writes output to the correct destination (file or console).
+ * Write output to file or console.
  */
 function writeOutput(data, file, append, isError = false) {
   try {
     if (file) {
-      const flags = append ? 'a' : 'w';
+      const flags = append ? "a" : "w";
       fs.writeFileSync(file, data, { flags });
     } else {
-      if (isError) {
-        process.stderr.write(data);
-      } else {
-        process.stdout.write(data);
-      }
+      (isError ? process.stderr : process.stdout).write(data);
     }
   } catch (e) {
-    // Always report file write errors to the shell's stderr
     process.stderr.write(`Shell error writing to ${file}: ${e.message}\n`);
   }
 }
 
+/**
+ * Main shell prompt logic.
+ */
 async function prompt() {
   rl.question("$ ", (answer) => {
-
     const input = answer.trim();
+    if (!input) return prompt();
 
-    // Exit commands
-    if (input === 'exit' || input === 'exit 0' || input === '0') {
+    // Exit
+    if (input === "exit" || input === "exit 0" || input === "0") {
       rl.close();
       process.exit(0);
       return;
     }
 
-    // Parse redirection
     const parts = input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
     const parsed = parseRedirection(parts);
     const {
@@ -151,193 +139,145 @@ async function prompt() {
       stdoutFile,
       stdoutAppend,
       stderrFile,
-      stderrAppend
+      stderrAppend,
     } = parsed;
 
-    if (!command) {
-      prompt();
-      return;
-    }
+    if (!command) return prompt();
 
-    // --- Built-in commands ---
+    // --- Builtins ---
 
     // echo
-    if (command === 'echo') {
+    if (command === "echo") {
       const cleanedArgs = args.map(arg => {
         if ((arg.startsWith("'") && arg.endsWith("'")) ||
           (arg.startsWith('"') && arg.endsWith('"'))) {
-          return arg.substring(1, arg.length - 1);
+          return arg.slice(1, -1);
         }
         return arg;
       });
-
-      const output = cleanedArgs.join(' ') + '\n';
+      const output = cleanedArgs.join(" ") + "\n";
       writeOutput(output, stdoutFile, stdoutAppend, false);
-      prompt();
+      return prompt();
     }
 
     // type
-    else if (command === 'type') {
+    else if (command === "type") {
       const targetCommand = args[0];
-      let output;
-      let isError = false;
+      let output, isError = false;
 
       if (!targetCommand) {
         output = "type: missing argument\n";
         isError = true;
-      }
-      else if (['echo', 'exit', 'type', 'pwd', 'cd'].includes(targetCommand)) {
+      } else if (["echo", "exit", "type", "pwd", "cd"].includes(targetCommand)) {
         output = `${targetCommand} is a shell builtin\n`;
       } else {
         const fullPath = findCommandInPath(targetCommand);
-        if (fullPath) {
-          output = `${targetCommand} is ${fullPath}\n`;
-        } else {
+        if (fullPath) output = `${targetCommand} is ${fullPath}\n`;
+        else {
           output = `${targetCommand}: not found\n`;
           isError = true;
         }
       }
-
-      writeOutput(output, isError ? stderrFile : stdoutFile, isError ? stderrAppend : stdoutAppend, isError);
-      prompt();
+      writeOutput(output, isError ? stderrFile : stdoutFile,
+        isError ? stderrAppend : stdoutAppend, isError);
+      return prompt();
     }
 
     // pwd
     else if (command === "pwd") {
-      const output = process.cwd() + '\n';
+      const output = process.cwd() + "\n";
       writeOutput(output, stdoutFile, stdoutAppend, false);
-      prompt();
+      return prompt();
     }
 
     // cd
     else if (command === "cd") {
-      let targetDir;
-      const originalArg = args[0] || '~';
-
-      if (!args[0] || args[0] === '~') {
-        targetDir = process.env.HOME || os.homedir();
-      } else {
-        targetDir = args[0];
-      }
-
-      if (targetDir.startsWith('~/')) {
+      let targetDir = args[0] || "~";
+      if (targetDir === "~") targetDir = os.homedir();
+      if (targetDir.startsWith("~/"))
         targetDir = path.join(os.homedir(), targetDir.slice(2));
-      }
 
       try {
-        if (!targetDir) {
-          throw new Error('Home directory not found');
-        }
         process.chdir(targetDir);
-      }
-      catch (err) {
-        let errorMsg;
+      } catch (err) {
+        let msg;
         switch (err.code) {
-          case 'ENOENT':
-            errorMsg = `cd: ${originalArg}: No such file or directory\n`;
-            break;
-          case 'ENOTDIR':
-            errorMsg = `cd: ${originalArg}: Not a directory\n`;
-            break;
-          default:
-            errorMsg = `cd: ${err.message}\n`;
+          case "ENOENT": msg = `cd: ${args[0]}: No such file or directory\n`; break;
+          case "ENOTDIR": msg = `cd: ${args[0]}: Not a directory\n`; break;
+          default: msg = `cd: ${err.message}\n`;
         }
-        writeOutput(errorMsg, stderrFile, stderrAppend, true);
+        writeOutput(msg, stderrFile, stderrAppend, true);
       }
-      prompt();
+      return prompt();
     }
 
-    // cat
-    // cat (multi-file support)
-    else if (command === 'cat') {
-      if (args.length === 0) {
-        prompt();
-        return;
-      }
+    // cat (multi-file)
+    else if (command === "cat") {
+      if (args.length === 0) return prompt();
 
       let index = 0;
-
       function readNext() {
-        if (index >= args.length) {
-          // all done
-          prompt();
-          return;
-        }
-
-        const filePath = args[index];
-        index++;
-
-        fs.readFile(filePath, 'utf8', (err, data) => {
+        if (index >= args.length) return prompt();
+        const filePath = args[index++];
+        fs.readFile(filePath, "utf8", (err, data) => {
           if (err) {
-            let errorMsg;
-            if (err.code === 'ENOENT') {
-              errorMsg = `cat: ${filePath}: No such file or directory\n`;
-            } else {
-              errorMsg = `cat: Error reading file: ${err.message}\n`;
-            }
-            writeOutput(errorMsg, stderrFile, stderrAppend, true);
+            let msg;
+            if (err.code === "ENOENT")
+              msg = `cat: ${filePath}: No such file or directory\n`;
+            else msg = `cat: Error reading file: ${err.message}\n`;
+            writeOutput(msg, stderrFile, stderrAppend, true);
           } else {
             writeOutput(data, stdoutFile, stdoutAppend, false);
           }
-
-          // Continue to next file after handling current one
           readNext();
         });
       }
-
-      readNext();
+      return readNext();
     }
 
-    // --- External commands ---
+    // --- External Commands ---
     else {
       const fullPath = findCommandInPath(command);
+      if (!fullPath) {
+        const msg = `${command}: command not found\n`;
+        writeOutput(msg, stderrFile, stderrAppend, true);
+        return prompt();
+      }
 
-      if (fullPath) {
-        let stdio = ['inherit', 'inherit', 'inherit'];
-        let stdoutFd = null;
-        let stderrFd = null;
+      let stdoutFd = null, stderrFd = null;
+      let stdio = ["inherit", "inherit", "inherit"];
 
-        try {
-          if (stdoutFile) {
-            const flags = stdoutAppend ? 'a' : 'w';
-            stdoutFd = fs.openSync(stdoutFile, flags);
-            stdio[1] = stdoutFd;
-          }
-
-          if (stderrFile) {
-            const flags = stderrAppend ? 'a' : 'w';
-            stderrFd = fs.openSync(stderrFile, flags);
-            stdio[2] = stderrFd;
-          }
-
-          const child = spawn(fullPath, args, {
-            stdio,
-            argv0: command
-          });
-
-          child.on('close', (code) => {
-            if (stdoutFd !== null) fs.closeSync(stdoutFd);
-            if (stderrFd !== null) fs.closeSync(stderrFd);
-            prompt();
-          });
-
-          child.on('error', (err) => {
-            if (stdoutFd !== null) fs.closeSync(stdoutFd);
-            if (stderrFd !== null) fs.closeSync(stderrFd);
-            writeOutput(`Error executing ${command}: ${err.message}\n`, stderrFile, stderrAppend, true);
-            prompt();
-          });
-
-        } catch (e) {
-          if (stdoutFd !== null) fs.closeSync(stdoutFd);
-          if (stderrFd !== null) fs.closeSync(stderrFd);
-          writeOutput(`Shell error: ${e.message}\n`, stderrFile, stderrAppend, true);
-          prompt();
+      try {
+        if (stdoutFile) {
+          const flags = stdoutAppend ? "a" : "w";
+          stdoutFd = fs.openSync(stdoutFile, flags);
+          stdio[1] = stdoutFd;
+        }
+        if (stderrFile) {
+          const flags = stderrAppend ? "a" : "w";
+          stderrFd = fs.openSync(stderrFile, flags);
+          stdio[2] = stderrFd;
         }
 
-      } else {
-        const errorMsg = `${command}: command not found\n`;
-        writeOutput(errorMsg, stderrFile, stderrAppend, true);
+        const child = spawn(fullPath, args, { stdio, argv0: command });
+
+        child.on("close", () => {
+          if (stdoutFd !== null) fs.closeSync(stdoutFd);
+          if (stderrFd !== null) fs.closeSync(stderrFd);
+          prompt();
+        });
+
+        child.on("error", (err) => {
+          if (stdoutFd !== null) fs.closeSync(stdoutFd);
+          if (stderrFd !== null) fs.closeSync(stderrFd);
+          const msg = `Error executing ${command}: ${err.message}\n`;
+          writeOutput(msg, stderrFile, stderrAppend, true);
+          prompt();
+        });
+      } catch (e) {
+        if (stdoutFd !== null) fs.closeSync(stdoutFd);
+        if (stderrFd !== null) fs.closeSync(stderrFd);
+        writeOutput(`Shell error: ${e.message}\n`, stderrFile, stderrAppend, true);
         prompt();
       }
     }
